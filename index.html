@@ -556,8 +556,16 @@
         <div class="group wall-only">
           <h2>Perspective</h2>
           <div class="ctrl">
+            <div class="row"><label>Preset</label></div>
+            <div class="seg" id="preset">
+              <button data-p="frontal">Frontal</button>
+              <button data-p="netflix">Netflix</button>
+              <button data-p="skyscraper">Skyscraper</button>
+            </div>
+          </div>
+          <div class="ctrl">
             <div class="row">
-              <label>Tilt (X)</label><span class="val" id="v-rx">0.30</span>
+              <label>Tilt (X)</label><span class="val" id="v-rx">-0.67</span>
             </div>
             <input
               type="range"
@@ -565,12 +573,12 @@
               min="-0.7"
               max="0.7"
               step="0.01"
-              value="0.30"
+              value="-0.67"
             />
           </div>
           <div class="ctrl">
             <div class="row">
-              <label>Turn (Y)</label><span class="val" id="v-ry">-0.42</span>
+              <label>Turn (Y)</label><span class="val" id="v-ry">-0.44</span>
             </div>
             <input
               type="range"
@@ -578,12 +586,12 @@
               min="-0.7"
               max="0.7"
               step="0.01"
-              value="-0.42"
+              value="-0.44"
             />
           </div>
           <div class="ctrl">
             <div class="row">
-              <label>Roll (Z)</label><span class="val" id="v-rz">-0.26</span>
+              <label>Roll (Z)</label><span class="val" id="v-rz">-0.15</span>
             </div>
             <input
               type="range"
@@ -591,20 +599,20 @@
               min="-0.7"
               max="0.7"
               step="0.01"
-              value="-0.26"
+              value="-0.15"
             />
           </div>
           <div class="ctrl">
             <div class="row">
-              <label>Zoom</label><span class="val" id="v-zoom">1.35</span>
+              <label>Zoom</label><span class="val" id="v-zoom">1.75</span>
             </div>
             <input
               type="range"
               id="zoom"
-              min="0.8"
+              min="0.2"
               max="4"
               step="0.01"
-              value="1.35"
+              value="1.75"
             />
           </div>
           <div class="ctrl">
@@ -699,15 +707,11 @@
         py: getEl("py"),
         vig: getEl("vig"),
       };
-      const DEFAULTS = {
-        rx: 0.3,
-        ry: -0.42,
-        rz: -0.26,
-        zoom: 1.35,
-        px: 0,
-        py: 0,
-        vig: 0.55,
-      };
+      // the default view is the netflix preset (its zoom is computed for the
+      // current frame, so this must be re-evaluated, not stored as constants)
+      function defaults() {
+        return { ...PRESETS.netflix(), vig: 0.55 };
+      }
 
       let IMAGES = []; // loaded HTMLImageElements
       let order = []; // shuffled index order for tiling
@@ -901,8 +905,9 @@
         return [X, Y, Z];
       }
 
-      // compute the 4 destination corners (screen px) of the tilted plane
-      function destCorners(p) {
+      // project the tilted plane's 4 corners at zoom 1, in screen px relative
+      // to the frame center (bbox cover-fits the frame, for any aspect ratio)
+      function projectCorners(rx, ry, rz) {
         const ar = wall.width / wall.height;
         const hw = ar,
           hh = 1;
@@ -916,12 +921,10 @@
         const D = 3.4,
           f = 2.2;
         const proj = planar.map(([px, py]) => {
-          const [X, Y, Z] = rotatePoint(px, py, p.rx, p.ry, p.rz);
+          const [X, Y, Z] = rotatePoint(px, py, rx, ry, rz);
           const denom = D - Z;
           return [(f * X) / denom, (f * Y) / denom];
         });
-        // cover-fit: scale so the tilted plane's bbox covers the frame, for any
-        // aspect ratio, then apply zoom + pan
         let minX = Infinity,
           maxX = -Infinity,
           minY = Infinity,
@@ -937,10 +940,15 @@
         const cx = (minX + maxX) / 2,
           cy = (minY + maxY) / 2;
         const base = Math.max(OUT_W / bw, OUT_H / bh);
-        const S = base * p.zoom;
-        return proj.map(([x, y]) => [
-          OUT_W / 2 + (x - cx) * S + p.px,
-          OUT_H / 2 - (y - cy) * S + p.py,
+        return proj.map(([x, y]) => [(x - cx) * base, -(y - cy) * base]);
+      }
+
+      // compute the 4 destination corners (screen px) of the tilted plane,
+      // applying zoom + pan about the frame center
+      function destCorners(p) {
+        return projectCorners(p.rx, p.ry, p.rz).map(([x, y]) => [
+          OUT_W / 2 + x * p.zoom + p.px,
+          OUT_H / 2 + y * p.zoom + p.py,
         ]);
       }
 
@@ -1127,6 +1135,7 @@
           }
         }
         drawVignette(+ui.vig.value);
+        syncPresetActive();
       }
 
       function drawVignette(amt) {
@@ -1326,12 +1335,74 @@
         order = shuffle(IMAGES.length);
         rebuild();
       });
-      getEl("reset").addEventListener("click", () => {
-        for (const k in DEFAULTS) {
-          ui[k].value = DEFAULTS[k];
-          ui[k].dispatchEvent(new Event("input")); // refresh label, fill + redraw
+      getEl("reset").addEventListener("click", () => applyValues(defaults()));
+
+      /* ---------- perspective presets ---------- */
+      // smallest zoom at which the tilted quad still covers the whole frame.
+      // zoom scales the quad about the frame center, so for each frame corner
+      // find where its ray from the center exits the zoom-1 quad: that corner
+      // needs zoom = (corner distance) / (exit distance).
+      function coverZoom(rx, ry, rz) {
+        if (!wall) return 1;
+        const quad = projectCorners(rx, ry, rz);
+        let z = 1;
+        for (const sx of [-1, 1])
+          for (const sy of [-1, 1]) {
+            const dx = (sx * OUT_W) / 2,
+              dy = (sy * OUT_H) / 2;
+            for (let i = 0; i < 4; i++) {
+              const [x1, y1] = quad[i],
+                [x2, y2] = quad[(i + 1) % 4];
+              const ex = x2 - x1,
+                ey = y2 - y1;
+              const det = ex * dy - ey * dx;
+              if (!det) continue;
+              const t = (ex * y1 - ey * x1) / det; // ray hits edge at t·(dx,dy)
+              const u = (dx * y1 - dy * x1) / det; // position along the edge
+              if (t > 0 && u >= 0 && u <= 1) z = Math.max(z, 1 / t);
+            }
+          }
+        return Math.min(+ui.zoom.max, Math.ceil(z * 100) / 100);
+      }
+      // a preset pins rotation and pan; zoom adapts to keep the frame covered
+      function preset(rx, ry, rz) {
+        return { rx, ry, rz, zoom: coverZoom(rx, ry, rz), px: 0, py: 0 };
+      }
+      const PRESETS = {
+        frontal: () => preset(0, 0, 0),
+        skyscraper: () => preset(-0.7, -0.7, 0.47),
+        netflix: () => preset(-0.67, -0.44, -0.15),
+      };
+      const presetBtns = [...document.querySelectorAll("#preset button")];
+      // highlight the preset whose values the sliders currently sit on
+      function syncPresetActive() {
+        const cur = {
+          rx: +ui.rx.value,
+          ry: +ui.ry.value,
+          rz: +ui.rz.value,
+          zoom: +ui.zoom.value,
+          px: +ui.px.value,
+          py: +ui.py.value,
+        };
+        presetBtns.forEach((b) => {
+          const v = PRESETS[b.dataset.p]();
+          b.classList.toggle(
+            "active",
+            Object.keys(v).every((k) => Math.abs(cur[k] - v[k]) < 0.005),
+          );
+        });
+      }
+      // set sliders to the given values; refreshes labels, fills + redraws
+      function applyValues(v) {
+        for (const k in v) {
+          ui[k].value = v[k];
+          ui[k].dispatchEvent(new Event("input"));
         }
-      });
+      }
+      presetBtns.forEach((b) =>
+        b.addEventListener("click", () => applyValues(PRESETS[b.dataset.p]())),
+      );
+      syncPresetActive(); // render() hasn't run yet while covers load
       getEl("download").addEventListener("click", () => {
         const a = document.createElement("a");
         a.download = `3ook-com-${mode === "pattern" ? "pattern" : "book-cover-art"}-${Date.now()}.png`;
@@ -1524,6 +1595,7 @@
 
       /* ---------- source: load books from NFT Class IDs (or top 100) ---------- */
       let loading = false;
+      let firstLoad = true; // sliders sync to the netflix preset once the first wall exists
 
       // pull NFT Class IDs out of the textarea; accepts commas / spaces / newlines
       function parseClassIds() {
@@ -1579,6 +1651,12 @@
           order = shuffle(IMAGES.length);
           setOverlay("Composing…", `${IMAGES.length} covers ready`, 0.98);
           if (mode === "wall") buildWall();
+          if (firstLoad && mode === "wall") {
+            // coverZoom needs the wall's aspect, so the initial (hardcoded)
+            // slider zoom can only be replaced by the computed one now
+            applyValues(defaults());
+            firstLoad = false;
+          }
           draw();
           hideOverlay();
         } catch (err) {
