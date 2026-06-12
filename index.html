@@ -479,13 +479,6 @@
       </div>
       <div class="scroll">
         <div class="group">
-          <h2>Mode</h2>
-          <div class="seg" id="mode">
-            <button data-m="wall" class="active">Wall</button>
-            <button data-m="pattern">Pattern</button>
-          </div>
-        </div>
-        <div class="group">
           <h2>Source</h2>
           <div class="ctrl">
             <div class="row">
@@ -502,7 +495,15 @@
             <button class="btn-primary" id="load-ids">↻ Load books</button>
           </div>
         </div>
-        <div class="group wall-only">
+        <div class="group">
+          <h2>Mode</h2>
+          <div class="seg" id="mode">
+            <button data-m="wall" class="active">Wall</button>
+            <button data-m="pattern">Pattern</button>
+            <button data-m="plain">Plain</button>
+          </div>
+        </div>
+        <div class="group" data-modes="wall">
           <h2>Format</h2>
           <div class="ctrl">
             <div class="row">
@@ -526,7 +527,7 @@
         </div>
         <div class="group">
           <h2>Layout</h2>
-          <div class="ctrl wall-only">
+          <div class="ctrl" data-modes="wall plain">
             <div class="row">
               <label>Columns</label><span class="val" id="v-cols">11</span>
             </div>
@@ -545,7 +546,7 @@
             </div>
             <input type="range" id="gap" min="0" max="48" step="2" value="14" />
           </div>
-          <label class="ctrl toggle" id="brick-toggle">
+          <label class="ctrl toggle" id="brick-toggle" data-modes="wall pattern">
             <span>Brick layout</span>
             <span class="switch"
               ><input type="checkbox" id="brick" /><span class="slider"></span
@@ -553,7 +554,7 @@
           </label>
           <p class="hint">Drag a cover to swap it with another.</p>
         </div>
-        <div class="group wall-only">
+        <div class="group" data-modes="wall">
           <h2>Perspective</h2>
           <div class="ctrl">
             <div class="row"><label>Preset</label></div>
@@ -642,7 +643,7 @@
             />
           </div>
         </div>
-        <div class="group wall-only">
+        <div class="group" data-modes="wall">
           <h2>Finish</h2>
           <div class="ctrl">
             <div class="row">
@@ -716,9 +717,10 @@
       let IMAGES = []; // loaded HTMLImageElements
       let order = []; // shuffled index order for tiling
       let wall = null; // offscreen wall canvas
-      let mode = "wall"; // 'wall' (perspective) or 'pattern' (seamless tile)
+      let mode = "wall"; // 'wall' (perspective), 'pattern' (seamless tile) or 'plain' (flat grid)
       let wallLayout = null; // grid geometry of the last built wall
       let patternLayout = null; // grid geometry of the last pattern render
+      let plainLayout = null; // grid geometry of the last plain render
       let lastH = null; // homography of the last wall render
 
       /* ---------- data fetching ---------- */
@@ -1233,9 +1235,61 @@
         }
       }
 
+      /* ---------- plain mode (flat grid, each cover once, partial last row ok) ---------- */
+      function renderPlain() {
+        if (!IMAGES.length) return;
+        const N = IMAGES.length;
+        const gap = +ui.gap.value;
+        const cols = Math.min(+ui.cols.value, N);
+        const rows = Math.ceil(N / cols);
+
+        // canvas hugs the grid (full-gap border); long side ≈ LONG_EDGE
+        const gfrac = Math.min(0.6, gap / 240);
+        const unitW = cols * (1 + gfrac) + gfrac;
+        const unitH = (rows * (1 + gfrac) + gfrac) / COVER_AR;
+        const cw = LONG_EDGE / Math.max(unitW, unitH);
+        const ch = cw / COVER_AR;
+        const g = cw * gfrac;
+        const PX = cw + g,
+          PY = ch + g;
+
+        OUT_W = Math.round(cols * PX + g);
+        OUT_H = Math.round(rows * PY + g);
+        out.width = OUT_W;
+        out.height = OUT_H;
+        plainLayout = { cols, rows, PX, PY, g, cw, ch, count: N };
+        const radius = Math.min(cw, ch) * 0.07;
+
+        octx.setTransform(1, 0, 0, 1, 0, 0);
+        octx.imageSmoothingQuality = "high";
+        octx.fillStyle = "#0a0a0d";
+        octx.fillRect(0, 0, OUT_W, OUT_H);
+
+        for (let i = 0; i < N; i++) {
+          const img = IMAGES[order[i]];
+          if (!img) continue;
+          const x = g + (i % cols) * PX;
+          const y = g + Math.floor(i / cols) * PY;
+          octx.save();
+          octx.beginPath();
+          octx.roundRect(x, y, cw, ch, radius);
+          octx.clip();
+          drawCover(octx, img, x, y, cw, ch);
+          octx.restore();
+          octx.save();
+          octx.beginPath();
+          octx.roundRect(x + 0.5, y + 0.5, cw - 1, ch - 1, radius);
+          octx.strokeStyle = "rgba(255,255,255,0.05)";
+          octx.lineWidth = 1;
+          octx.stroke();
+          octx.restore();
+        }
+      }
+
       /* ---------- scheduling ---------- */
       function draw() {
         if (mode === "pattern") renderPattern();
+        else if (mode === "plain") renderPlain();
         else render();
       }
 
@@ -1313,7 +1367,7 @@
         }),
       );
 
-      /* ---------- mode: wall vs pattern ---------- */
+      /* ---------- mode: wall vs pattern vs plain ---------- */
       const modeBtns = [...document.querySelectorAll("#mode button")];
       function setMode(m) {
         mode = m;
@@ -1321,11 +1375,16 @@
           b.classList.toggle("active", b.dataset.m === m),
         );
         document
-          .querySelectorAll(".wall-only")
-          .forEach((e) => (e.style.display = m === "wall" ? "" : "none"));
+          .querySelectorAll("[data-modes]")
+          .forEach(
+            (e) =>
+              (e.style.display = e.dataset.modes.split(" ").includes(m)
+                ? ""
+                : "none"),
+          );
         if (m === "wall")
           applyFormat(); // restore the chosen aspect ratio, resize + draw
-        else rebuild(); // pattern sizes its own canvas to fit the grid
+        else rebuild(); // pattern/plain size their own canvas to fit the grid
       }
       modeBtns.forEach((b) =>
         b.addEventListener("click", () => setMode(b.dataset.m)),
@@ -1405,7 +1464,7 @@
       syncPresetActive(); // render() hasn't run yet while covers load
       getEl("download").addEventListener("click", () => {
         const a = document.createElement("a");
-        a.download = `3ook-com-${mode === "pattern" ? "pattern" : "book-cover-art"}-${Date.now()}.png`;
+        a.download = `3ook-com-${mode === "wall" ? "book-cover-art" : mode}-${Date.now()}.png`;
         a.href = out.toDataURL("image/png");
         a.click();
       });
@@ -1488,6 +1547,24 @@
             path: roundRectPts(x0, y0, L.cw, L.ch).map(([qx, qy]) =>
               applyH(lastH, qx, qy),
             ),
+          };
+        }
+        if (mode === "plain") {
+          if (!plainLayout) return null;
+          const L = plainLayout;
+          const c = Math.floor((x - L.g) / L.PX);
+          if (c < 0 || c >= L.cols) return null;
+          const xIn = x - L.g - c * L.PX;
+          if (xIn < 0 || xIn > L.cw) return null;
+          const r = Math.floor((y - L.g) / L.PY);
+          if (r < 0 || r >= L.rows) return null;
+          const yIn = y - L.g - r * L.PY;
+          if (yIn < 0 || yIn > L.ch) return null;
+          const i = r * L.cols + c;
+          if (i >= L.count) return null; // empty slot in the partial last row
+          return {
+            pos: i,
+            path: roundRectPts(L.g + c * L.PX, L.g + r * L.PY, L.cw, L.ch),
           };
         }
         if (!patternLayout) return null;
@@ -1636,17 +1713,24 @@
               0.05 + 0.35 * (d / t),
             );
           });
-          const valid = urls.filter(Boolean);
+          // keep each cover URL paired with its class ID so failures can be reported
+          const valid = ids
+            .map((id, i) => ({ id, url: urls[i] }))
+            .filter((e) => e.url);
           if (!valid.length)
             throw new Error("no covers found for those NFT Class IDs");
 
           setOverlay("Loading images…", `0 / ${valid.length}`, 0.4);
-          const imgs = await pool(valid, 10, loadImage, (d, t) => {
+          const imgs = await pool(valid, 10, (e) => loadImage(e.url), (d, t) => {
             setOverlay("Loading images…", `${d} / ${t}`, 0.4 + 0.55 * (d / t));
           });
           IMAGES = imgs.filter(Boolean);
           if (IMAGES.length < 1)
             throw new Error("could not load any cover images");
+
+          const failed = ids
+            .filter((_, i) => !urls[i])
+            .concat(valid.filter((e, i) => !imgs[i]).map((e) => e.id));
 
           order = shuffle(IMAGES.length);
           setOverlay("Composing…", `${IMAGES.length} covers ready`, 0.98);
@@ -1659,6 +1743,12 @@
           }
           draw();
           hideOverlay();
+          if (failed.length) {
+            console.warn("Books that couldn't be loaded:", failed);
+            alert(
+              `${failed.length} of ${ids.length} book cover${failed.length > 1 ? "s" : ""} couldn't be loaded:\n\n${failed.join("\n")}`,
+            );
+          }
         } catch (err) {
           console.error(err);
           document.querySelector(".spinner").style.display = "none";
