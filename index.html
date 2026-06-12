@@ -320,6 +320,34 @@
         max-height: calc(100vh - 56px);
         width: auto;
         height: auto;
+        touch-action: none;
+        cursor: grab;
+      }
+      #out.dragging {
+        cursor: grabbing;
+      }
+      #hl {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .drag-ghost {
+        position: fixed;
+        width: 64px;
+        height: auto;
+        border-radius: 5px;
+        pointer-events: none;
+        z-index: 99;
+        opacity: 0.85;
+        transform: translate(-50%, -50%) rotate(3deg);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 8px 0 0;
       }
       .overlay {
         position: absolute;
@@ -523,6 +551,7 @@
               ><input type="checkbox" id="brick" /><span class="slider"></span
             ></span>
           </label>
+          <p class="hint">Drag a cover to swap it with another.</p>
         </div>
         <div class="group wall-only">
           <h2>Perspective</h2>
@@ -636,6 +665,7 @@
       <div class="stage">
         <div class="frame">
           <canvas id="out" width="2560" height="1440"></canvas>
+          <canvas id="hl"></canvas>
           <div class="overlay" id="overlay">
             <div class="spinner"></div>
             <div class="ov-text" id="ov-text">Fetching books…</div>
@@ -683,6 +713,9 @@
       let order = []; // shuffled index order for tiling
       let wall = null; // offscreen wall canvas
       let mode = "wall"; // 'wall' (perspective) or 'pattern' (seamless tile)
+      let wallLayout = null; // grid geometry of the last built wall
+      let patternLayout = null; // grid geometry of the last pattern render
+      let lastH = null; // homography of the last wall render
 
       /* ---------- data fetching ---------- */
       const NFT_BOOK_LIST = "https://indexer.v3.like.co/collective/api/book-nfts?sort_by=staked_amount&sort_order=desc&pagination.limit=100";
@@ -798,6 +831,7 @@
 
         const W = cols * cw + (cols + 1) * gap;
         const H = rows * ch + (rows + 1) * gap;
+        wallLayout = { cols, rows, cw, ch, gap, brick };
 
         const c =
           wall && wall.width === W && wall.height === H
@@ -1042,6 +1076,7 @@
           [0, H],
         ];
         const h = homography(src, dst);
+        lastH = h;
 
         // precompute warped mesh vertices
         const grid = [];
@@ -1152,6 +1187,7 @@
         PY = OUT_H / rows;
         cw = PX - g;
         ch = PY - g;
+        patternLayout = { cols, rows, PX, PY, g, cw, ch, brick };
         const radius = Math.min(cw, ch) * 0.07;
 
         octx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1301,6 +1337,189 @@
         a.download = `3ook-com-${mode === "pattern" ? "pattern" : "book-cover-art"}-${Date.now()}.png`;
         a.href = out.toDataURL("image/png");
         a.click();
+      });
+
+      /* ---------- drag a cover to rearrange ---------- */
+      const hl = getEl("hl");
+      const hctx = hl.getContext("2d");
+      let drag = null; // {src, cur, moved, x0, y0}
+      let ghost = null; // floating thumbnail following the pointer
+
+      // inverse of the 3x3 homography [h0..h7, 1] (unnormalized adjugate —
+      // the scale factor cancels in the projective divide)
+      function invertH(h) {
+        const [a, b, c, d, e, f, g, hh] = h;
+        return [
+          e - f * hh, c * hh - b, b * f - c * e,
+          f * g - d, a - c * g, c * d - a * f,
+          d * hh - e * g, b * g - a * hh, a * e - b * d,
+        ];
+      }
+      function applyM(m, x, y) {
+        const w = m[6] * x + m[7] * y + m[8];
+        return [
+          (m[0] * x + m[1] * y + m[2]) / w,
+          (m[3] * x + m[4] * y + m[5]) / w,
+        ];
+      }
+      function toCanvasXY(e) {
+        const r = out.getBoundingClientRect();
+        return [
+          ((e.clientX - r.left) * OUT_W) / r.width,
+          ((e.clientY - r.top) * OUT_H) / r.height,
+        ];
+      }
+
+      // rounded-rect outline as a point list (so it can be warped per-point);
+      // matches the corner radius the covers are drawn with
+      function roundRectPts(x, y, w, h) {
+        const r = Math.min(w, h) * 0.07;
+        const pts = [];
+        const SEG = 6;
+        const corner = (cx, cy, a0) => {
+          for (let i = 0; i <= SEG; i++) {
+            const a = a0 + (i / SEG) * (Math.PI / 2);
+            pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+          }
+        };
+        corner(x + r, y + r, Math.PI); // top-left
+        corner(x + w - r, y + r, -Math.PI / 2); // top-right
+        corner(x + w - r, y + h - r, 0); // bottom-right
+        corner(x + r, y + h - r, Math.PI / 2); // bottom-left
+        return pts;
+      }
+
+      // which cover cell sits under canvas point (x,y)?
+      // pos indexes into `order`; path = the cell's outline in canvas px
+      function cellAt(x, y) {
+        if (!order.length) return null;
+        if (mode === "wall") {
+          if (!wallLayout || !lastH) return null;
+          const L = wallLayout;
+          const [wx, wy] = applyM(invertH(lastH), x, y);
+          const stepX = L.cw + L.gap,
+            stepY = L.ch + L.gap;
+          const cc = Math.floor((wx - L.gap) / stepX);
+          if (cc < 0 || cc >= L.cols) return null;
+          const xIn = wx - L.gap - cc * stepX;
+          if (xIn < 0 || xIn > L.cw) return null;
+          const yOff = L.brick && cc % 2 ? stepY / 2 : 0;
+          const r = Math.floor((wy - L.gap - yOff) / stepY);
+          if (r < -1 || r > L.rows) return null;
+          const yIn = wy - L.gap - yOff - r * stepY;
+          if (yIn < 0 || yIn > L.ch) return null;
+          // k mirrors buildWall's column-major fill (rows+2 cells per column)
+          const k = cc * (L.rows + 2) + (r + 1);
+          const x0 = L.gap + cc * stepX,
+            y0 = L.gap + r * stepY + yOff;
+          return {
+            pos: k % order.length,
+            path: roundRectPts(x0, y0, L.cw, L.ch).map(([qx, qy]) =>
+              applyH(lastH, qx, qy),
+            ),
+          };
+        }
+        if (!patternLayout) return null;
+        const L = patternLayout;
+        const c = Math.floor(x / L.PX);
+        const xIn = x - c * L.PX - L.g / 2;
+        if (xIn < 0 || xIn > L.cw) return null;
+        const cWrap = ((c % L.cols) + L.cols) % L.cols;
+        const yOff = L.brick && cWrap % 2 ? L.PY / 2 : 0;
+        const r = Math.floor((y - yOff - L.g / 2) / L.PY);
+        const yIn = y - r * L.PY - yOff - L.g / 2;
+        if (yIn < 0 || yIn > L.ch) return null;
+        const rWrap = ((r % L.rows) + L.rows) % L.rows;
+        const x0 = c * L.PX + L.g / 2,
+          y0 = r * L.PY + yOff + L.g / 2;
+        return {
+          pos: (cWrap * L.rows + rWrap) % order.length,
+          path: roundRectPts(x0, y0, L.cw, L.ch),
+        };
+      }
+
+      function strokeCell(cell, fill) {
+        hctx.beginPath();
+        const q = cell.path;
+        hctx.moveTo(q[0][0], q[0][1]);
+        for (let i = 1; i < q.length; i++) hctx.lineTo(q[i][0], q[i][1]);
+        hctx.closePath();
+        if (fill) {
+          hctx.fillStyle = fill;
+          hctx.fill();
+        }
+        hctx.strokeStyle = "rgba(80,227,194,0.9)";
+        hctx.lineWidth = Math.max(3, OUT_W / 640);
+        hctx.stroke();
+      }
+      function drawHl(src, target) {
+        if (hl.width !== OUT_W || hl.height !== OUT_H) {
+          hl.width = OUT_W;
+          hl.height = OUT_H;
+        }
+        hctx.clearRect(0, 0, OUT_W, OUT_H);
+        if (src) strokeCell(src, "rgba(0,0,0,0.35)");
+        if (target && (!src || target.pos !== src.pos))
+          strokeCell(target, "rgba(80,227,194,0.18)");
+      }
+      function clearHl() {
+        hctx.clearRect(0, 0, hl.width, hl.height);
+      }
+
+      out.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        const [x, y] = toCanvasXY(e);
+        const cell = cellAt(x, y);
+        if (!cell) return;
+        drag = { src: cell, cur: null, moved: false, x0: e.clientX, y0: e.clientY };
+        out.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      out.addEventListener("pointermove", (e) => {
+        const [x, y] = toCanvasXY(e);
+        if (!drag) {
+          drawHl(null, cellAt(x, y)); // hover hint
+          return;
+        }
+        if (!drag.moved) {
+          if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+          drag.moved = true;
+          out.classList.add("dragging");
+          const img = IMAGES[order[drag.src.pos]];
+          if (img) {
+            ghost = document.createElement("img");
+            ghost.src = img.src;
+            ghost.className = "drag-ghost";
+            document.body.appendChild(ghost);
+          }
+        }
+        if (ghost) {
+          ghost.style.left = e.clientX + "px";
+          ghost.style.top = e.clientY + "px";
+        }
+        drag.cur = cellAt(x, y);
+        drawHl(drag.src, drag.cur);
+      });
+      function endDrag(commit) {
+        if (!drag) return;
+        if (commit && drag.moved && drag.cur && drag.cur.pos !== drag.src.pos) {
+          const a = drag.src.pos,
+            b = drag.cur.pos;
+          [order[a], order[b]] = [order[b], order[a]];
+          rebuild();
+        }
+        out.classList.remove("dragging");
+        if (ghost) {
+          ghost.remove();
+          ghost = null;
+        }
+        clearHl();
+        drag = null;
+      }
+      out.addEventListener("pointerup", () => endDrag(true));
+      out.addEventListener("pointercancel", () => endDrag(false));
+      out.addEventListener("pointerleave", () => {
+        if (!drag) clearHl();
       });
 
       /* ---------- source: load books from NFT Class IDs (or top 100) ---------- */
