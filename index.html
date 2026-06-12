@@ -239,6 +239,19 @@
         gap: 10px;
         margin-top: 4px;
       }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+      }
+      .btn-row button {
+        flex: 1;
+      }
+      .actions {
+        margin-bottom: 0;
+        padding: 14px 22px 18px;
+        border-top: 1px solid var(--line);
+        background: var(--panel);
+      }
       button {
         font: inherit;
         font-weight: 700;
@@ -659,13 +672,15 @@
             />
           </div>
         </div>
-        <div class="group">
-          <h2>Actions</h2>
-          <div class="btns">
-            <button class="btn-ghost" id="shuffle">🔀 Shuffle covers</button>
-            <button class="btn-ghost" id="reset">↺ Reset view</button>
-            <button class="btn-primary" id="download">⬇ Download PNG</button>
+      </div>
+      <div class="group actions">
+        <h2>Actions</h2>
+        <div class="btns">
+          <div class="btn-row">
+            <button class="btn-ghost" id="shuffle">🔀 Shuffle</button>
+            <button class="btn-ghost" id="reset">↺ Reset</button>
           </div>
+          <button class="btn-primary" id="download">⬇ Download PNG</button>
         </div>
       </div>
     </aside>
