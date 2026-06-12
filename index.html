@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3ook.com · Book Cover Art Generator</title>
+    <style>
+      :root {
+        --bg: #0c0c0c;
+        --panel: #131313;
+        --panel2: #1b1b1b;
+        --line: #272727;
+        --text: #f9f9f9;
+        --muted: #8a8a8a;
+        --accent: #50e3c2;
+        --accent2: #6cead0;
+        --on-accent: #131313;
+        --radius: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: radial-gradient(
+            1200px 700px at 70% -10%,
+            #1c1c1c 0%,
+            var(--bg) 55%
+          )
+          fixed;
+        color: var(--text);
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        display: flex;
+        min-height: 100%;
+      }
+      /* ---------- Sidebar ---------- */
+      aside {
+        width: 330px;
+        flex: 0 0 330px;
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+      }
+      .brand {
+        padding: 20px 22px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 0.2px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .logo {
+        width: 28px;
+        height: 28px;
+        display: block;
+        border-radius: 6px;
+        flex: 0 0 28px;
+      }
+      .brand p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .scroll {
+        overflow-y: auto;
+        padding: 18px 22px 26px;
+        flex: 1;
+      }
+      .scroll::-webkit-scrollbar {
+        width: 9px;
+      }
+      .scroll::-webkit-scrollbar-thumb {
+        background: #2c2c2c;
+        border-radius: 8px;
+        border: 2px solid var(--panel);
+      }
+      .group {
+        margin-bottom: 20px;
+      }
+      .group h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+        color: var(--muted);
+        margin: 0 0 12px;
+        font-weight: 700;
+      }
+      .ctrl {
+        margin-bottom: 14px;
+      }
+      .ctrl .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+      }
+      .ctrl label {
+        font-size: 12.5px;
+        color: #d7d7de;
+      }
+      .ctrl .val {
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 4px;
+        background: linear-gradient(
+          90deg,
+          var(--accent) var(--p, 50%),
+          #2c2c2c var(--p, 50%)
+        );
+        outline: none;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        border: 3px solid var(--accent);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        cursor: pointer;
+      }
+      select {
+        width: 100%;
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 11px;
+        font: inherit;
+        cursor: pointer;
+        appearance: none;
+        background-image:
+          linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+          linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+        background-position:
+          calc(100% - 18px) 17px,
+          calc(100% - 13px) 17px;
+        background-size:
+          5px 5px,
+          5px 5px;
+        background-repeat: no-repeat;
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+      }
+      .seg button {
+        flex: 1;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        border-radius: 9px;
+        padding: 9px 8px;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+      .seg button.active {
+        background: var(--accent);
+        color: var(--on-accent);
+        border-color: var(--accent);
+        box-shadow: 0 3px 10px rgba(80, 227, 194, 0.25);
+      }
+      .seg button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .switch {
+        position: relative;
+        width: 42px;
+        height: 24px;
+        flex: 0 0 42px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        inset: 0;
+        background: #2c2c2c;
+        border-radius: 24px;
+        transition: 0.2s;
+      }
+      .slider:before {
+        content: "";
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: 0.2s;
+      }
+      .switch input:checked + .slider {
+        background: var(--accent);
+      }
+      .switch input:checked + .slider:before {
+        transform: translateX(18px);
+      }
+      .btns {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      button {
+        font: inherit;
+        font-weight: 700;
+        border: none;
+        border-radius: 11px;
+        padding: 12px 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition:
+          transform 0.06s,
+          filter 0.15s,
+          background 0.15s;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--on-accent);
+        box-shadow: 0 6px 18px rgba(80, 227, 194, 0.28);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent2);
+      }
+      .btn-ghost {
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        filter: brightness(1.25);
+      }
+      /* ---------- Main ---------- */
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+      .stage {
+        flex: 1;
+        display: grid;
+        place-items: center;
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(
+            900px 500px at 50% 30%,
+            rgba(80, 227, 194, 0.06),
+            transparent 60%
+          ),
+          repeating-linear-gradient(45deg, #0c0c0f 0 12px, #0a0a0d 12px 24px);
+      }
+      .frame {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow:
+          0 40px 90px -30px rgba(0, 0, 0, 0.9),
+          0 0 0 1px rgba(255, 255, 255, 0.05);
+        background: #000;
+        line-height: 0;
+      }
+      #out {
+        display: block;
+        max-width: 100%;
+        max-height: calc(100vh - 56px);
+        width: auto;
+        height: auto;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 8, 10, 0.78);
+        backdrop-filter: blur(3px);
+        text-align: center;
+        padding: 30px;
+        transition: opacity 0.3s;
+        z-index: 5;
+      }
+      .overlay.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .spinner {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 4px solid #262626;
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .bar {
+        width: 260px;
+        height: 6px;
+        border-radius: 6px;
+        background: #222222;
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        transition: width 0.2s;
+      }
+      .ov-text {
+        font-weight: 600;
+      }
+      .ov-sub {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      a.credit {
+        color: var(--muted);
+        text-decoration: none;
+        border-bottom: 1px dotted #444;
+      }
+      a.credit:hover {
+        color: var(--text);
+      }
+      textarea {
+        width: 100%;
+        resize: vertical;
+        min-height: 78px;
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 11px;
+        font:
+          12px/1.45 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        outline: none;
+      }
+      textarea:focus {
+        border-color: var(--accent);
+      }
+      textarea::placeholder {
+        color: #5a5a64;
+      }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <div class="brand">
+        <h1>
+          <svg
+            class="logo"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect width="16" height="16" rx="2" fill="#131313" />
+            <path
+              d="M12.5 4C12.7761 4 13 4.22386 13 4.5V6.79297C13 6.92555 12.9473 7.05273 12.8535 7.14648L12.3535 7.64648C12.1583 7.84174 12.1583 8.15826 12.3535 8.35352L12.8535 8.85352C12.9473 8.94727 13 9.07445 13 9.20703V11.793C13 11.9255 12.9473 12.0527 12.8535 12.1465L11.1465 13.8535C11.0527 13.9473 10.9255 14 10.793 14H4.5C4.22386 14 4 13.7761 4 13.5V11.5C4 11.2239 4.22386 11 4.5 11H5.5C5.74171 11 5.94371 11.1714 5.99023 11.3994L6.00977 11.6006C6.05629 11.8286 6.25829 12 6.5 12H10.5C10.7761 12 11 11.7761 11 11.5V9.5C11 9.22386 10.7761 9 10.5 9H6.5C6.22386 9 6 8.77614 6 8.5V7.5C6 7.22386 6.22386 7 6.5 7H10.5C10.7761 7 11 6.77614 11 6.5V4H12.5Z"
+              fill="#50E3C2"
+            />
+            <path
+              d="M10.5 2C10.7761 2 11 2.22386 11 2.5V4H4.5C4.22386 4 4 3.77614 4 3.5V2.5C4 2.22386 4.22386 2 4.5 2H10.5Z"
+              fill="#50E3C2"
+            />
+            <path
+              d="M12 6.79289C12 6.9255 11.9473 7.05268 11.8536 7.14645L11.3536 7.64645C11.1583 7.84171 11.1583 8.15829 11.3536 8.35355L11.8536 8.85355C11.9473 8.94732 12 9.0745 12 9.20711V11.7929C12 11.9255 11.9473 12.0527 11.8536 12.1464L10.1464 13.8536C10.0527 13.9473 9.9255 14 9.79289 14H3.5C3.22386 14 3 13.7761 3 13.5V11.5C3 11.2239 3.22386 11 3.5 11H4.5C4.77614 11 5 11.2239 5 11.5C5 11.7761 5.22386 12 5.5 12H9.5C9.77614 12 10 11.7761 10 11.5V9.5C10 9.22386 9.77614 9 9.5 9H5.5C5.22386 9 5 8.77614 5 8.5V7.5C5 7.22386 5.22386 7 5.5 7H9.5C9.77614 7 10 6.77614 10 6.5V4H11.5C11.7761 4 12 4.22386 12 4.5V6.79289Z"
+              fill="#F9F9F9"
+            />
+            <path
+              d="M10 4H3.5C3.22386 4 3 3.77614 3 3.5V2.5C3 2.22386 3.22386 2 3.5 2H9.5C9.77614 2 10 2.22386 10 2.5V4Z"
+              fill="#F9F9F9"
+            />
+          </svg>
+          Book Cover Art
+        </h1>
+        <p>
+          Build banners with
+          <a
+            class="credit"
+            href="https://3ook.com"
+            target="_blank"
+            rel="noopener"
+            >3ook.com</a
+          >
+          book covers.
+        </p>
+      </div>
+      <div class="scroll">
+        <div class="group">
+          <h2>Mode</h2>
+          <div class="seg" id="mode">
+            <button data-m="wall" class="active">Wall</button>
+            <button data-m="pattern">Pattern</button>
+          </div>
+        </div>
+        <div class="group">
+          <h2>Source</h2>
+          <div class="ctrl">
+            <div class="row">
+              <label>NFT Class IDs</label
+              ><span class="val" id="v-src">top 100</span>
+            </div>
+            <textarea
+              id="classids"
+              spellcheck="false"
+              placeholder="Paste NFT Class IDs (0x… EVM addresses), separated by commas, spaces or new lines.&#10;&#10;Leave empty to use the top 100 books by stake."
+            ></textarea>
+          </div>
+          <div class="btns">
+            <button class="btn-primary" id="load-ids">↻ Load books</button>
+          </div>
+        </div>
+        <div class="group wall-only">
+          <h2>Format</h2>
+          <div class="ctrl">
+            <div class="row">
+              <label>Aspect ratio</label
+              ><span class="val" id="v-dim">2560×1440</span>
+            </div>
+            <select id="aspect">
+              <option value="16:9" selected>16 : 9 — Widescreen</option>
+              <option value="1:1">1 : 1 — Square</option>
+              <option value="297:210">297 : 210 — A4</option>
+              <option value="1200:630">1200 : 630 — Facebook OG</option>
+            </select>
+          </div>
+          <div class="ctrl">
+            <div class="row"><label>Orientation</label></div>
+            <div class="seg" id="orient">
+              <button data-o="landscape" class="active">Landscape</button>
+              <button data-o="portrait">Portrait</button>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <h2>Layout</h2>
+          <div class="ctrl wall-only">
+            <div class="row">
+              <label>Columns</label><span class="val" id="v-cols">11</span>
+            </div>
+            <input
+              type="range"
+              id="cols"
+              min="2"
+              max="22"
+              step="1"
+              value="11"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Gap</label><span class="val" id="v-gap">14</span>
+            </div>
+            <input type="range" id="gap" min="0" max="48" step="2" value="14" />
+          </div>
+          <label class="ctrl toggle" id="brick-toggle">
+            <span>Brick layout</span>
+            <span class="switch"
+              ><input type="checkbox" id="brick" /><span class="slider"></span
+            ></span>
+          </label>
+        </div>
+        <div class="group wall-only">
+          <h2>Perspective</h2>
+          <div class="ctrl">
+            <div class="row">
+              <label>Tilt (X)</label><span class="val" id="v-rx">0.30</span>
+            </div>
+            <input
+              type="range"
+              id="rx"
+              min="-0.7"
+              max="0.7"
+              step="0.01"
+              value="0.30"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Turn (Y)</label><span class="val" id="v-ry">-0.42</span>
+            </div>
+            <input
+              type="range"
+              id="ry"
+              min="-0.7"
+              max="0.7"
+              step="0.01"
+              value="-0.42"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Roll (Z)</label><span class="val" id="v-rz">-0.26</span>
+            </div>
+            <input
+              type="range"
+              id="rz"
+              min="-0.7"
+              max="0.7"
+              step="0.01"
+              value="-0.26"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Zoom</label><span class="val" id="v-zoom">1.35</span>
+            </div>
+            <input
+              type="range"
+              id="zoom"
+              min="0.8"
+              max="4"
+              step="0.01"
+              value="1.35"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Pan X</label><span class="val" id="v-px">0</span>
+            </div>
+            <input
+              type="range"
+              id="px"
+              min="-600"
+              max="600"
+              step="10"
+              value="0"
+            />
+          </div>
+          <div class="ctrl">
+            <div class="row">
+              <label>Pan Y</label><span class="val" id="v-py">0</span>
+            </div>
+            <input
+              type="range"
+              id="py"
+              min="-600"
+              max="600"
+              step="10"
+              value="0"
+            />
+          </div>
+        </div>
+        <div class="group wall-only">
+          <h2>Finish</h2>
+          <div class="ctrl">
+            <div class="row">
+              <label>Vignette</label><span class="val" id="v-vig">0.55</span>
+            </div>
+            <input
+              type="range"
+              id="vig"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.55"
+            />
+          </div>
+        </div>
+        <div class="group">
+          <h2>Actions</h2>
+          <div class="btns">
+            <button class="btn-ghost" id="shuffle">🔀 Shuffle covers</button>
+            <button class="btn-ghost" id="reset">↺ Reset view</button>
+            <button class="btn-primary" id="download">⬇ Download PNG</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="stage">
+        <div class="frame">
+          <canvas id="out" width="2560" height="1440"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="spinner"></div>
+            <div class="ov-text" id="ov-text">Fetching books…</div>
+            <div class="bar"><i id="ov-bar"></i></div>
+            <div class="ov-sub" id="ov-sub">Loading covers from Arweave</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      "use strict";
+      let OUT_W = 2560, OUT_H = 1440; // download resolution (set by Format)
+      const LONG_EDGE = 2560; // longest side, in px
+      const COVER_AR = 1 / 1.6; // book cover aspect (w/h) = 1 : 1.6
+      const MESH_X = 46, MESH_Y = 30; // warp triangle-mesh resolution
+
+      const out = document.getElementById("out");
+      const octx = out.getContext("2d");
+      const getEl = (id) => document.getElementById(id);
+
+      const ui = {
+        cols: getEl("cols"),
+        gap: getEl("gap"),
+        brick: getEl("brick"),
+        rx: getEl("rx"),
+        ry: getEl("ry"),
+        rz: getEl("rz"),
+        zoom: getEl("zoom"),
+        px: getEl("px"),
+        py: getEl("py"),
+        vig: getEl("vig"),
+      };
+      const DEFAULTS = {
+        rx: 0.3,
+        ry: -0.42,
+        rz: -0.26,
+        zoom: 1.35,
+        px: 0,
+        py: 0,
+        vig: 0.55,
+      };
+
+      let IMAGES = []; // loaded HTMLImageElements
+      let order = []; // shuffled index order for tiling
+      let wall = null; // offscreen wall canvas
+      let mode = "wall"; // 'wall' (perspective) or 'pattern' (seamless tile)
+
+      /* ---------- data fetching ---------- */
+      const NFT_BOOK_LIST = "https://indexer.v3.like.co/collective/api/book-nfts?sort_by=staked_amount&sort_order=desc&pagination.limit=100";
+      const NFT_BOOK_METADATA = "https://api.like.co/likerland/nft/metadata";
+
+      function normalizeUri(uri) {
+        if (!uri) return null;
+        if (uri.startsWith("ar://"))
+          return "https://arweave.net/" + uri.slice(5);
+        if (uri.startsWith("ipfs://"))
+          return "https://ipfs.io/ipfs/" + uri.slice(7);
+        return uri;
+      }
+
+      async function fetchBooks() {
+        const r = await fetch(NFT_BOOK_LIST);
+        if (!r.ok) throw new Error("indexer " + r.status);
+        const j = await r.json();
+        return (j.data || []).map((b) => b.evm_address).filter(Boolean);
+      }
+
+      async function fetchCover(classId) {
+        const u = new URL(NFT_BOOK_METADATA);
+        u.searchParams.set("class_id", classId.toLowerCase());
+        u.searchParams.set("data", "class_chain");
+        const r = await fetch(u);
+        if (!r.ok) return null;
+        const j = await r.json();
+        const cd = j.classData || {};
+        return normalizeUri(cd.thumbnailUrl || cd.image);
+      }
+
+      function loadImage(url) {
+        return new Promise((res) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => res(img.naturalWidth ? img : null);
+          img.onerror = () => res(null);
+          img.src = url;
+        });
+      }
+
+      // run async tasks with bounded concurrency, reporting progress
+      async function pool(items, limit, fn, onProgress) {
+        const results = new Array(items.length);
+        let i = 0, done = 0;
+        async function worker() {
+          while (i < items.length) {
+            const idx = i++;
+            results[idx] = await fn(items[idx], idx);
+            onProgress && onProgress(++done, items.length);
+          }
+        }
+        await Promise.all(
+          Array.from({ length: Math.min(limit, items.length) }, worker),
+        );
+        return results;
+      }
+
+      /* ---------- overlay helpers ---------- */
+      const overlay = getEl("overlay");
+      function setOverlay(text, sub, pct) {
+        getEl("ov-text").textContent = text;
+        if (sub != null) getEl("ov-sub").textContent = sub;
+        if (pct != null) getEl("ov-bar").style.width = Math.round(pct * 100) + "%";
+      }
+      function hideOverlay() {
+        overlay.classList.add("hide");
+      }
+
+      /* ---------- wall (flat grid of covers) ---------- */
+      function shuffle(n) {
+        const a = Array.from({ length: n }, (_, i) => i);
+        for (let i = n - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function drawCover(ctx, img, x, y, w, h) {
+        // cover-fit (center-crop) the image into the cell rect
+        const ir = img.naturalWidth / img.naturalHeight,
+              cr = w / h;
+        let sw, sh, sx, sy;
+        if (ir > cr) {
+          sh = img.naturalHeight;
+          sw = sh * cr;
+          sx = (img.naturalWidth - sw) / 2;
+          sy = 0;
+        } else {
+          sw = img.naturalWidth;
+          sh = sw / cr;
+          sx = 0;
+          sy = (img.naturalHeight - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+      }
+
+      function buildWall() {
+        if (!IMAGES.length) return;
+        const cols = +ui.cols.value;
+        const gap = +ui.gap.value;
+        const brick = ui.brick.checked;
+
+        const cw = 240; // cover cell width (px)
+        const ch = Math.round(cw / COVER_AR); // cover cell height
+        // enough rows to comfortably fill a 16:9 frame after tilt
+        const rows = Math.max(
+          6,
+          Math.round(cols * (OUT_H / OUT_W) * (cw / ch) * 1.9),
+        );
+
+        const W = cols * cw + (cols + 1) * gap;
+        const H = rows * ch + (rows + 1) * gap;
+
+        const c =
+          wall && wall.width === W && wall.height === H
+            ? wall
+            : Object.assign(document.createElement("canvas"), {
+                width: W,
+                height: H,
+              });
+        const ctx = c.getContext("2d");
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "#131313";
+        ctx.fillRect(0, 0, W, H);
+
+        const radius = Math.min(cw, ch) * 0.07;
+        let k = 0;
+        // column-major so alternating columns can be offset (brick pattern).
+        // r runs -1..rows so the half-cell shift never leaves gaps top/bottom.
+        for (let cc = 0; cc < cols; cc++) {
+          const x = gap + cc * (cw + gap);
+          const yOff = brick && cc % 2 ? (ch + gap) / 2 : 0;
+          for (let r = -1; r <= rows; r++) {
+            const img = IMAGES[order[k++ % order.length]];
+            if (!img) continue;
+            const y = gap + r * (ch + gap) + yOff;
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(x, y, cw, ch, radius);
+            ctx.clip();
+            drawCover(ctx, img, x, y, cw, ch);
+            // subtle depth variation: darken some tiles
+            const dim = (cc * 7 + (r + 1) * 3) % 5;
+            if (dim > 2) {
+              ctx.fillStyle = `rgba(0,0,0,${0.1 + dim * 0.045})`;
+              ctx.fillRect(x, y, cw, ch);
+            }
+            ctx.restore();
+            // hairline edge
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(x + 0.5, y + 0.5, cw - 1, ch - 1, radius);
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+        wall = c;
+      }
+
+      /* ---------- 3D perspective warp ---------- */
+      // rotate (x,y,0) by Rz then Rx then Ry
+      function rotatePoint(x, y, rx, ry, rz) {
+        // Rz
+        let X = x * Math.cos(rz) - y * Math.sin(rz);
+        let Y = x * Math.sin(rz) + y * Math.cos(rz);
+        let Z = 0;
+        // Rx
+        let Y2 = Y * Math.cos(rx) - Z * Math.sin(rx);
+        let Z2 = Y * Math.sin(rx) + Z * Math.cos(rx);
+        Y = Y2;
+        Z = Z2;
+        // Ry
+        let X2 = X * Math.cos(ry) + Z * Math.sin(ry);
+        let Z3 = -X * Math.sin(ry) + Z * Math.cos(ry);
+        X = X2;
+        Z = Z3;
+        return [X, Y, Z];
+      }
+
+      // compute the 4 destination corners (screen px) of the tilted plane
+      function destCorners(p) {
+        const ar = wall.width / wall.height;
+        const hw = ar,
+          hh = 1;
+        // plane corners TL,TR,BR,BL  (match wall TL,TR,BR,BL)
+        const planar = [
+          [-hw, hh],
+          [hw, hh],
+          [hw, -hh],
+          [-hw, -hh],
+        ];
+        const D = 3.4,
+          f = 2.2;
+        const proj = planar.map(([px, py]) => {
+          const [X, Y, Z] = rotatePoint(px, py, p.rx, p.ry, p.rz);
+          const denom = D - Z;
+          return [(f * X) / denom, (f * Y) / denom];
+        });
+        // cover-fit: scale so the tilted plane's bbox covers the frame, for any
+        // aspect ratio, then apply zoom + pan
+        let minX = Infinity,
+          maxX = -Infinity,
+          minY = Infinity,
+          maxY = -Infinity;
+        for (const [x, y] of proj) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+        const bw = maxX - minX,
+          bh = maxY - minY;
+        const cx = (minX + maxX) / 2,
+          cy = (minY + maxY) / 2;
+        const base = Math.max(OUT_W / bw, OUT_H / bh);
+        const S = base * p.zoom;
+        return proj.map(([x, y]) => [
+          OUT_W / 2 + (x - cx) * S + p.px,
+          OUT_H / 2 - (y - cy) * S + p.py,
+        ]);
+      }
+
+      // solve 3x3 homography mapping src[4] -> dst[4] (returns h0..h7, h8=1)
+      function homography(src, dst) {
+        const A = [],
+          b = [];
+        for (let i = 0; i < 4; i++) {
+          const [x, y] = src[i],
+            [u, v] = dst[i];
+          A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
+          b.push(u);
+          A.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
+          b.push(v);
+        }
+        return gauss(A, b); // length 8
+      }
+      function gauss(A, b) {
+        const n = b.length;
+        for (let col = 0; col < n; col++) {
+          let piv = col;
+          for (let r = col + 1; r < n; r++)
+            if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
+          [A[col], A[piv]] = [A[piv], A[col]];
+          [b[col], b[piv]] = [b[piv], b[col]];
+          const d = A[col][col] || 1e-9;
+          for (let c = col; c < n; c++) A[col][c] /= d;
+          b[col] /= d;
+          for (let r = 0; r < n; r++) {
+            if (r === col) continue;
+            const fac = A[r][col];
+            for (let c = col; c < n; c++) A[r][c] -= fac * A[col][c];
+            b[r] -= fac * b[col];
+          }
+        }
+        return b;
+      }
+      function applyH(h, x, y) {
+        const w = h[6] * x + h[7] * y + 1;
+        return [
+          (h[0] * x + h[1] * y + h[2]) / w,
+          (h[3] * x + h[4] * y + h[5]) / w,
+        ];
+      }
+
+      // draw source triangle -> dest triangle (affine, with slight outward expansion)
+      function texTri(ctx, img, s, d) {
+        // expand dst outward from centroid to hide seams
+        const cx = (d[0][0] + d[1][0] + d[2][0]) / 3,
+          cy = (d[0][1] + d[1][1] + d[2][1]) / 3;
+        const e = 0.7;
+        const D = d.map(([x, y]) => {
+          const dx = x - cx,
+            dy = y - cy,
+            l = Math.hypot(dx, dy) || 1;
+          return [x + (dx / l) * e, y + (dy / l) * e];
+        });
+        // affine from src->dst : solve 3x3
+        const [s0, s1, s2] = s,
+          [d0, d1, d2] = D;
+        const det =
+          s0[0] * (s1[1] - s2[1]) +
+          s1[0] * (s2[1] - s0[1]) +
+          s2[0] * (s0[1] - s1[1]);
+        if (Math.abs(det) < 1e-6) return;
+        const id = 1 / det;
+        // matrix coeffs
+        const a =
+          id *
+          (d0[0] * (s1[1] - s2[1]) +
+            d1[0] * (s2[1] - s0[1]) +
+            d2[0] * (s0[1] - s1[1]));
+        const c =
+          id *
+          (d0[0] * (s2[0] - s1[0]) +
+            d1[0] * (s0[0] - s2[0]) +
+            d2[0] * (s1[0] - s0[0]));
+        const e2 =
+          id *
+          (d0[0] * (s1[0] * s2[1] - s2[0] * s1[1]) +
+            d1[0] * (s2[0] * s0[1] - s0[0] * s2[1]) +
+            d2[0] * (s0[0] * s1[1] - s1[0] * s0[1]));
+        const b =
+          id *
+          (d0[1] * (s1[1] - s2[1]) +
+            d1[1] * (s2[1] - s0[1]) +
+            d2[1] * (s0[1] - s1[1]));
+        const dd =
+          id *
+          (d0[1] * (s2[0] - s1[0]) +
+            d1[1] * (s0[0] - s2[0]) +
+            d2[1] * (s1[0] - s0[0]));
+        const ff =
+          id *
+          (d0[1] * (s1[0] * s2[1] - s2[0] * s1[1]) +
+            d1[1] * (s2[0] * s0[1] - s0[0] * s2[1]) +
+            d2[1] * (s0[0] * s1[1] - s1[0] * s0[1]));
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(D[0][0], D[0][1]);
+        ctx.lineTo(D[1][0], D[1][1]);
+        ctx.lineTo(D[2][0], D[2][1]);
+        ctx.closePath();
+        ctx.clip();
+        ctx.setTransform(a, b, c, dd, e2, ff);
+        ctx.drawImage(img, 0, 0);
+        ctx.restore();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+
+      function render() {
+        if (!wall) return;
+        const p = {
+          rx: +ui.rx.value,
+          ry: +ui.ry.value,
+          rz: +ui.rz.value,
+          zoom: +ui.zoom.value,
+          px: +ui.px.value,
+          py: +ui.py.value,
+        };
+        octx.setTransform(1, 0, 0, 1, 0, 0);
+        octx.imageSmoothingQuality = "high";
+        octx.fillStyle = "#000";
+        octx.fillRect(0, 0, OUT_W, OUT_H);
+
+        const W = wall.width,
+          H = wall.height;
+        const dst = destCorners(p);
+        const src = [
+          [0, 0],
+          [W, 0],
+          [W, H],
+          [0, H],
+        ];
+        const h = homography(src, dst);
+
+        // precompute warped mesh vertices
+        const grid = [];
+        for (let j = 0; j <= MESH_Y; j++) {
+          const row = [];
+          for (let i = 0; i <= MESH_X; i++) {
+            const sx = (i / MESH_X) * W,
+              sy = (j / MESH_Y) * H;
+            const [dx, dy] = applyH(h, sx, sy);
+            row.push([sx, sy, dx, dy]);
+          }
+          grid.push(row);
+        }
+        for (let j = 0; j < MESH_Y; j++) {
+          for (let i = 0; i < MESH_X; i++) {
+            const a = grid[j][i],
+              b = grid[j][i + 1],
+              c = grid[j + 1][i + 1],
+              d = grid[j + 1][i];
+            texTri(
+              octx,
+              wall,
+              [
+                [a[0], a[1]],
+                [b[0], b[1]],
+                [c[0], c[1]],
+              ],
+              [
+                [a[2], a[3]],
+                [b[2], b[3]],
+                [c[2], c[3]],
+              ],
+            );
+            texTri(
+              octx,
+              wall,
+              [
+                [a[0], a[1]],
+                [c[0], c[1]],
+                [d[0], d[1]],
+              ],
+              [
+                [a[2], a[3]],
+                [c[2], c[3]],
+                [d[2], d[3]],
+              ],
+            );
+          }
+        }
+        drawVignette(+ui.vig.value);
+      }
+
+      function drawVignette(amt) {
+        if (amt <= 0) return;
+        octx.setTransform(1, 0, 0, 1, 0, 0);
+        // radial darkening toward edges
+        const rg = octx.createRadialGradient(
+          OUT_W * 0.5,
+          OUT_H * 0.42,
+          OUT_H * 0.18,
+          OUT_W * 0.5,
+          OUT_H * 0.5,
+          OUT_W * 0.72,
+        );
+        rg.addColorStop(0, "rgba(0,0,0,0)");
+        rg.addColorStop(1, `rgba(0,0,0,${0.62 * amt})`);
+        octx.fillStyle = rg;
+        octx.fillRect(0, 0, OUT_W, OUT_H);
+        // top + bottom bands
+        const lg = octx.createLinearGradient(0, 0, 0, OUT_H);
+        lg.addColorStop(0, `rgba(0,0,0,${0.55 * amt})`);
+        lg.addColorStop(0.22, "rgba(0,0,0,0)");
+        lg.addColorStop(0.8, "rgba(0,0,0,0)");
+        lg.addColorStop(1, `rgba(0,0,0,${0.65 * amt})`);
+        octx.fillStyle = lg;
+        octx.fillRect(0, 0, OUT_W, OUT_H);
+      }
+
+      /* ---------- pattern mode (flat, seamless, 1:1) ---------- */
+      function renderPattern() {
+        if (!IMAGES.length) return;
+        const N = IMAGES.length;
+        const gap = +ui.gap.value;
+        const brick = ui.brick.checked;
+
+        // best-effort near-square grid that shows every cover once
+        let rows = Math.max(1, Math.round(Math.sqrt(N * COVER_AR)));
+        let cols = Math.max(1, Math.ceil(N / rows));
+        if (brick && cols % 2) cols++; // even columns keep brick seamless across the x-seam
+
+        // Cells keep the natural book-cover aspect; the canvas sizes itself to the grid
+        // (no forced 1:1), so brick just makes the canvas wider — covers aren't squished.
+        const gfrac = Math.min(0.6, gap / 240);
+        const unitW = cols * (1 + gfrac);
+        const unitH = (rows * (1 + gfrac)) / COVER_AR;
+        let cw = LONG_EDGE / Math.max(unitW, unitH); // pick cover width so the long side ≈ LONG_EDGE
+        let ch = cw / COVER_AR;
+        const g = cw * gfrac;
+        let PX = cw + g,
+          PY = ch + g;
+
+        OUT_W = Math.round(cols * PX);
+        OUT_H = Math.round(rows * PY);
+        out.width = OUT_W;
+        out.height = OUT_H;
+        // re-derive from the integer canvas so the grid fills it exactly (perfect seam)
+        PX = OUT_W / cols;
+        PY = OUT_H / rows;
+        cw = PX - g;
+        ch = PY - g;
+        const radius = Math.min(cw, ch) * 0.07;
+
+        octx.setTransform(1, 0, 0, 1, 0, 0);
+        octx.imageSmoothingQuality = "high";
+        octx.fillStyle = "#0a0a0d";
+        octx.fillRect(0, 0, OUT_W, OUT_H);
+
+        // Draw one extra ring of cells (c/r from -1..cols/rows), wrapping the cover
+        // index by modulo on both axes — so the tile's edges duplicate the opposite
+        // side and the boundary is concealed when the image is used as a repeating bg.
+        for (let c = -1; c <= cols; c++) {
+          const cw_ = ((c % cols) + cols) % cols;
+          const yOff = brick && cw_ % 2 ? PY / 2 : 0;
+          for (let r = -1; r <= rows; r++) {
+            const rw = ((r % rows) + rows) % rows;
+            const img = IMAGES[order[(cw_ * rows + rw) % order.length]];
+            if (!img) continue;
+            const x = c * PX + g / 2;
+            const y = r * PY + yOff + g / 2;
+            octx.save();
+            octx.beginPath();
+            octx.roundRect(x, y, cw, ch, radius);
+            octx.clip();
+            drawCover(octx, img, x, y, cw, ch);
+            octx.restore();
+            octx.save();
+            octx.beginPath();
+            octx.roundRect(x + 0.5, y + 0.5, cw - 1, ch - 1, radius);
+            octx.strokeStyle = "rgba(255,255,255,0.05)";
+            octx.lineWidth = 1;
+            octx.stroke();
+            octx.restore();
+          }
+        }
+      }
+
+      /* ---------- scheduling ---------- */
+      function draw() {
+        if (mode === "pattern") renderPattern();
+        else render();
+      }
+
+      let rafPending = false;
+      function scheduleRender() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          rafPending = false;
+          draw();
+        });
+      }
+      function rebuild() {
+        if (mode === "wall") {
+          buildWall();
+          scheduleRender();
+        } else draw(); // pattern is a cheap flat grid — draw immediately
+      }
+
+      /* ---------- UI wiring ---------- */
+      function syncFill(input) {
+        const min = +input.min,
+          max = +input.max,
+          p = ((+input.value - min) / (max - min)) * 100;
+        input.style.setProperty("--p", p + "%");
+      }
+      function bind(id, valId, onChange, fmt) {
+        const el = ui[id];
+        const v = getEl(valId);
+        const update = () => {
+          if (v) v.textContent = fmt ? fmt(el.value) : el.value;
+          syncFill(el);
+          onChange();
+        };
+        el.addEventListener("input", update);
+        update();
+      }
+      bind("cols", "v-cols", rebuild);
+      bind("gap", "v-gap", rebuild);
+      ui.brick.addEventListener("change", rebuild);
+      bind("rx", "v-rx", scheduleRender, (v) => (+v).toFixed(2));
+      bind("ry", "v-ry", scheduleRender, (v) => (+v).toFixed(2));
+      bind("rz", "v-rz", scheduleRender, (v) => (+v).toFixed(2));
+      bind("zoom", "v-zoom", scheduleRender, (v) => (+v).toFixed(2));
+      bind("px", "v-px", scheduleRender);
+      bind("py", "v-py", scheduleRender);
+      bind("vig", "v-vig", scheduleRender, (v) => (+v).toFixed(2));
+
+      /* ---------- format: aspect ratio + orientation ---------- */
+      const aspectSel = getEl("aspect");
+      const orientBtns = [...document.querySelectorAll("#orient button")];
+      let orientation = "landscape";
+      function applyFormat() {
+        const [w, h] = aspectSel.value.split(":").map(Number);
+        const square = w === h;
+        orientBtns.forEach((b) => (b.disabled = square));
+        if (orientation === "landscape" || square) {
+          OUT_W = LONG_EDGE;
+          OUT_H = Math.round((LONG_EDGE * h) / w);
+        } else {
+          OUT_H = LONG_EDGE;
+          OUT_W = Math.round((LONG_EDGE * h) / w);
+        }
+        out.width = OUT_W;
+        out.height = OUT_H;
+        getEl("v-dim").textContent = OUT_W + "×" + OUT_H;
+        rebuild();
+      }
+      aspectSel.addEventListener("change", applyFormat);
+      orientBtns.forEach((b) =>
+        b.addEventListener("click", () => {
+          orientation = b.dataset.o;
+          orientBtns.forEach((x) => x.classList.toggle("active", x === b));
+          applyFormat();
+        }),
+      );
+
+      /* ---------- mode: wall vs pattern ---------- */
+      const modeBtns = [...document.querySelectorAll("#mode button")];
+      function setMode(m) {
+        mode = m;
+        modeBtns.forEach((b) =>
+          b.classList.toggle("active", b.dataset.m === m),
+        );
+        document
+          .querySelectorAll(".wall-only")
+          .forEach((e) => (e.style.display = m === "wall" ? "" : "none"));
+        if (m === "wall")
+          applyFormat(); // restore the chosen aspect ratio, resize + draw
+        else rebuild(); // pattern sizes its own canvas to fit the grid
+      }
+      modeBtns.forEach((b) =>
+        b.addEventListener("click", () => setMode(b.dataset.m)),
+      );
+
+      getEl("shuffle").addEventListener("click", () => {
+        order = shuffle(IMAGES.length);
+        rebuild();
+      });
+      getEl("reset").addEventListener("click", () => {
+        for (const k in DEFAULTS) {
+          ui[k].value = DEFAULTS[k];
+          ui[k].dispatchEvent(new Event("input")); // refresh label, fill + redraw
+        }
+      });
+      getEl("download").addEventListener("click", () => {
+        const a = document.createElement("a");
+        a.download = `3ook-com-${mode === "pattern" ? "pattern" : "book-cover-art"}-${Date.now()}.png`;
+        a.href = out.toDataURL("image/png");
+        a.click();
+      });
+
+      /* ---------- source: load books from NFT Class IDs (or top 100) ---------- */
+      let loading = false;
+
+      // pull NFT Class IDs out of the textarea; accepts commas / spaces / newlines
+      function parseClassIds() {
+        return getEl("classids")
+          .value.split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+
+      async function loadBooks() {
+        if (loading) return;
+        loading = true;
+        getEl("load-ids").disabled = true;
+        overlay.classList.remove("hide");
+        document.querySelector(".spinner").style.display = "";
+        try {
+          const custom = parseClassIds();
+          let ids;
+          if (custom.length) {
+            ids = custom;
+            getEl("v-src").textContent = `${ids.length} custom`;
+          } else {
+            setOverlay("Fetching books…", "Querying 3ook.com indexer", 0.02);
+            ids = await fetchBooks();
+            getEl("v-src").textContent = "Top 100";
+          }
+          if (!ids.length) throw new Error("no NFT Class IDs to load");
+
+          setOverlay(
+            "Resolving covers…",
+            `0 / ${ids.length} from Arweave`,
+            0.05,
+          );
+          const urls = await pool(ids, 10, fetchCover, (d, t) => {
+            setOverlay(
+              "Resolving covers…",
+              `${d} / ${t} from Arweave`,
+              0.05 + 0.35 * (d / t),
+            );
+          });
+          const valid = urls.filter(Boolean);
+          if (!valid.length)
+            throw new Error("no covers found for those NFT Class IDs");
+
+          setOverlay("Loading images…", `0 / ${valid.length}`, 0.4);
+          const imgs = await pool(valid, 10, loadImage, (d, t) => {
+            setOverlay("Loading images…", `${d} / ${t}`, 0.4 + 0.55 * (d / t));
+          });
+          IMAGES = imgs.filter(Boolean);
+          if (IMAGES.length < 1)
+            throw new Error("could not load any cover images");
+
+          order = shuffle(IMAGES.length);
+          setOverlay("Composing…", `${IMAGES.length} covers ready`, 0.98);
+          if (mode === "wall") buildWall();
+          draw();
+          hideOverlay();
+        } catch (err) {
+          console.error(err);
+          document.querySelector(".spinner").style.display = "none";
+          setOverlay("Couldn't load", String(err.message || err), 0);
+        } finally {
+          loading = false;
+          getEl("load-ids").disabled = false;
+        }
+      }
+
+      getEl("load-ids").addEventListener("click", loadBooks);
+      loadBooks();
+    </script>
+  </body>
+</html>
